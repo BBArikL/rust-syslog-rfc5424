@@ -1,9 +1,11 @@
 use std::convert::TryFrom;
 
 #[cfg(feature = "serde-serialize")]
-use serde::{Serialize, Serializer};
+use serde::{de::Visitor, Deserialize, Serialize, Serializer};
 
 use thiserror::Error;
+
+use crate::parser::ParseErr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(non_camel_case_types)]
@@ -66,12 +68,56 @@ impl SyslogSeverity {
             SyslogSeverity::SEV_DEBUG => "debug",
         }
     }
+
+    /// Convert a string to a syslog severity
+    pub fn from_str(v: &str) -> Result<SyslogSeverity, ParseErr> {
+        match v {
+            "emerg" => Ok(SyslogSeverity::SEV_EMERG),
+            "alert" => Ok(SyslogSeverity::SEV_ALERT),
+            "crit" => Ok(SyslogSeverity::SEV_CRIT),
+            "err" => Ok(SyslogSeverity::SEV_ERR),
+            "warning" => Ok(SyslogSeverity::SEV_WARNING),
+            "notice" => Ok(SyslogSeverity::SEV_NOTICE),
+            "info" => Ok(SyslogSeverity::SEV_INFO),
+            "debug" => Ok(SyslogSeverity::SEV_DEBUG),
+            &_ => Err(ParseErr::BadSeverityInPri),
+        }
+    }
 }
 
 #[cfg(feature = "serde-serialize")]
 impl Serialize for SyslogSeverity {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+struct SyslogSeverityVisitor;
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Visitor<'de> for SyslogSeverityVisitor {
+    type Value = SyslogSeverity;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        SyslogSeverity::from_str(v).map_err(|err| E::custom(err.to_string()))
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Deserialize<'de> for SyslogSeverity {
+    fn deserialize<D>(des: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        des.deserialize_str(SyslogSeverityVisitor)
     }
 }
 

@@ -1,9 +1,11 @@
 #[cfg(feature = "serde-serialize")]
-use serde::{Serialize, Serializer};
+use serde::{de::Visitor, Deserialize, Serialize, Serializer};
 
 use std::convert::TryFrom;
 
 use thiserror::Error;
+
+use crate::parser::ParseErr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 #[allow(non_camel_case_types)]
@@ -112,12 +114,72 @@ impl SyslogFacility {
             SyslogFacility::LOG_LOCAL7 => "local7",
         }
     }
+
+    /// Convert a str to a syslog facility
+    pub fn from_str(facility: &str) -> Result<SyslogFacility, ParseErr> {
+        match facility {
+            "kern" => Ok(SyslogFacility::LOG_KERN),
+            "user" => Ok(SyslogFacility::LOG_USER),
+            "mail" => Ok(SyslogFacility::LOG_MAIL),
+            "daemon" => Ok(SyslogFacility::LOG_DAEMON),
+            "auth" => Ok(SyslogFacility::LOG_AUTH),
+            "syslog" => Ok(SyslogFacility::LOG_SYSLOG),
+            "lpr" => Ok(SyslogFacility::LOG_LPR),
+            "news" => Ok(SyslogFacility::LOG_NEWS),
+            "uucp" => Ok(SyslogFacility::LOG_UUCP),
+            "cron" => Ok(SyslogFacility::LOG_CRON),
+            "authpriv" => Ok(SyslogFacility::LOG_AUTHPRIV),
+            "ftp" => Ok(SyslogFacility::LOG_FTP),
+            "ntp" => Ok(SyslogFacility::LOG_NTP),
+            "audit" => Ok(SyslogFacility::LOG_AUDIT),
+            "alert" => Ok(SyslogFacility::LOG_ALERT),
+            "clockd" => Ok(SyslogFacility::LOG_CLOCKD),
+            "local0" => Ok(SyslogFacility::LOG_LOCAL0),
+            "local1" => Ok(SyslogFacility::LOG_LOCAL1),
+            "local2" => Ok(SyslogFacility::LOG_LOCAL2),
+            "local3" => Ok(SyslogFacility::LOG_LOCAL3),
+            "local4" => Ok(SyslogFacility::LOG_LOCAL4),
+            "local5" => Ok(SyslogFacility::LOG_LOCAL5),
+            "local6" => Ok(SyslogFacility::LOG_LOCAL6),
+            "local7" => Ok(SyslogFacility::LOG_LOCAL7),
+            &_ => Err(ParseErr::BadFacilityInPri),
+        }
+    }
 }
 
 #[cfg(feature = "serde-serialize")]
 impl Serialize for SyslogFacility {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+struct SyslogFacilityVisitor;
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Visitor<'de> for SyslogFacilityVisitor {
+    type Value = SyslogFacility;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        SyslogFacility::from_str(v).map_err(|err| E::custom(err.to_string()))
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Deserialize<'de> for SyslogFacility {
+    fn deserialize<D>(des: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        des.deserialize_str(SyslogFacilityVisitor)
     }
 }
 

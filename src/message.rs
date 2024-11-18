@@ -2,13 +2,13 @@
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::convert::Into;
+use std::convert::{Into, TryFrom};
 use std::ops;
 use std::str::FromStr;
 use std::string::String;
 
 #[cfg(feature = "serde-serialize")]
-use serde::{Serialize, Serializer};
+use serde::{de::Visitor, Deserialize, Serialize, Serializer};
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -48,6 +48,137 @@ impl Serialize for ProcId {
     }
 }
 
+#[cfg(feature = "serde-serialize")]
+struct ProcIDVisitor;
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Visitor<'de> for ProcIDVisitor {
+    type Value = ProcId;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an i32 or a String")
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::Name(v.to_string()))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::Name(v.to_string()))
+    }
+
+    fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::PID(i32::from(v)))
+    }
+
+    fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::PID(i32::from(v)))
+    }
+
+    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::PID(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let v = i32::try_from(v).map_err(|_| Err(E::custom(format!("i32 out of range: {}", v))));
+        if v.is_ok() {
+            Ok(ProcId::PID(v.unwrap()))
+        } else {
+            v.err().unwrap()
+        }
+    }
+
+    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::PID(i32::from(v)))
+    }
+
+    fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(ProcId::PID(i32::from(v)))
+    }
+
+    fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let v = i32::try_from(v).map_err(|_| Err(E::custom(format!("i32 out of range: {}", v))));
+        if v.is_ok() {
+            Ok(ProcId::PID(v.unwrap()))
+        } else {
+            v.err().unwrap()
+        }
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let v = i32::try_from(v).map_err(|_| Err(E::custom(format!("i32 out of range: {}", v))));
+        if v.is_ok() {
+            Ok(ProcId::PID(v.unwrap()))
+        } else {
+            v.err().unwrap()
+        }
+    }
+
+    fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let v = i32::try_from(v).map_err(|_| Err(E::custom(format!("i32 out of range: {}", v))));
+        if v.is_ok() {
+            Ok(ProcId::PID(v.unwrap()))
+        } else {
+            v.err().unwrap()
+        }
+    }
+
+    fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let v = i32::try_from(v).map_err(|_| Err(E::custom(format!("i32 out of range: {}", v))));
+        if v.is_ok() {
+            Ok(ProcId::PID(v.unwrap()))
+        } else {
+            v.err().unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Deserialize<'de> for ProcId {
+    fn deserialize<D>(des: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        des.deserialize_any(ProcIDVisitor)
+    }
+}
+
 pub type SDIDType = String;
 pub type SDParamIDType = String;
 pub type SDParamValueType = String;
@@ -80,6 +211,44 @@ impl ops::Deref for StructuredData {
 impl Serialize for StructuredData {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         self.elements.serialize(ser)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+struct BtreeMapVisitor;
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Visitor<'de> for BtreeMapVisitor {
+    type Value = BTreeMap<SDIDType, StructuredDataElement>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a map")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut btree = BTreeMap::new();
+
+        // While there are entries remaining in the input, add them
+        // into our map.
+        while let Some((key, value)) = map.next_entry()? {
+            btree.insert(key, value);
+        }
+
+        Ok(btree)
+    }
+}
+
+#[cfg(feature = "serde-serialize")]
+impl<'de> Deserialize<'de> for StructuredData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let elements = deserializer.deserialize_map(BtreeMapVisitor).unwrap();
+        Ok(Self { elements })
     }
 }
 
@@ -145,7 +314,7 @@ impl StructuredData {
     }
 }
 
-#[cfg_attr(feature = "serde-serialize", derive(Serialize))]
+#[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A RFC5424-protocol syslog message
 pub struct SyslogMessage {
