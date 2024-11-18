@@ -12,15 +12,15 @@ edition = "2018"
 
 [dependencies]
 time = "0.3"
-serde = { version = "1.0", optional = true, features=["derive"] }
-serde_json = { version = "1.0", optional = true }
-thiserror = "1.0"
+serde = { version = "1.0", optional = true, features = ["derive"] }
+thiserror = "2.0"
 
 [dev-dependencies]
 timeit = { version = "0.1", git = "https://github.com/Roguelazer/timeit", rev = "9e9f2e1b9ab9537a72fc4e59ccfc1e89b5b51239" }
+serde_json = { version = "1.0" }
 
 [features]
-serde-serialize = ["serde", "serde_json"]
+serde-serialize = ["serde"]
 
 [package.metadata.docs.rs]
 all-features = true
